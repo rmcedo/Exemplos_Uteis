@@ -1,116 +1,152 @@
-import javax.inject.Inject;
-/**
- * Classe de Exemplo de Montagem de WHERE utilitário
- * 
- * ps.: necessário verificar os ALIAS na hora da criação do SELECT,
- * para que haja concordância com os ALIAS utilizados na classe SqlBuilderUtil
- * 
- * cd = consolidacao_demanda
- * ed = e075der
- * ei = e120ipd
- * ep = e120ped 
- * moo = mpcp_op_origem
- *   
- * @author Rafael.DaSilva
- *
- */
-public class SqlBuilderUtil {
+package br.com.senior.erp.man.pcp.programacaocontrole.primitive.otif;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import br.com.senior.erpman.pcpprogramacaocontrole.EnumSituacaoDemanda;
+import br.com.senior.erpman.pcpprogramacaocontrole.SearchNeedsOTIFInput;
+
+public final class SqlBuilderWhere {
+
     private static final String AND = " AND ";
-    
+
     private static final int ANDSIZE = 5;
-    
-    @Inject
-    private FiltroRecordHandler filterHandler;
-    
-    
-    public static String sqlWhere() {
-        
-        var stringBuilder  = new StringBuilder( "WHERE ");
-        
-        appendCompanyId(stringBuilder);
-        appendBranchId(stringBuilder);
-        appendFamilyId(stringBuilder);
-        appendSkuIds(stringBuilder);
-        appendDocuments(stringBuilder);
-        appendStartDate(stringBuilder);
-        appendEndDate(stringBuilder);
-        appendClient(stringBuilder);
-        appendDemands(stringBuilder);
-        appendSituationDemand(stringBuilder);
-        appendDeliveryStartDate(stringBuilder);
-        appendDeliveryEndDate(stringBuilder);
-        
-        if (stringBuilder.toString().endsWith(AND)) {
-            stringBuilder.setLength(stringBuilder.length() - ANDSIZE);
+
+    private SqlBuilderWhere() {
+    }
+
+    public static String sqlWhereBuilder(SearchNeedsOTIFInput request) {
+
+        var mountSqlWhere = new StringBuilder(" WHERE ");
+
+        mountSqlWhere.append(appendProductionOrderIds(request.filterNeedsOTIF.productionOrderIds));
+        mountSqlWhere.append(appendCompanycompanyCode(request.filterNeedsOTIF.companyCode));
+        mountSqlWhere.append(appendBranchCode(request.filterNeedsOTIF.branchCode));
+        mountSqlWhere.append(appendFamilyCode(request.filterNeedsOTIF.familyCode));
+        mountSqlWhere.append(appendSkuIds(request.filterNeedsOTIF.skuIds));
+        mountSqlWhere.append(appendDocuments(request.filterNeedsOTIF.documents));
+        mountSqlWhere.append(appendStartDate(request.filterNeedsOTIF.startDate));
+        mountSqlWhere.append(appendEndDate(request.filterNeedsOTIF.endDate));
+        mountSqlWhere.append(appendClient(request.filterNeedsOTIF.client));
+        mountSqlWhere.append(appendDemands(request.filterNeedsOTIF.demands));
+        mountSqlWhere.append(appendSituationDemand(request.filterNeedsOTIF.situationDemand));
+        mountSqlWhere.append(appendDeliveryStartDate(request.filterNeedsOTIF.deliveryStartDate));
+        mountSqlWhere.append(appendDeliveryEndDate(request.filterNeedsOTIF.deliveryEndDate));
+
+        if (mountSqlWhere.toString().endsWith(AND)) {
+            mountSqlWhere.setLength(mountSqlWhere.length() - ANDSIZE);
         }
 
-        return stringBuilder.toString();
+        return mountSqlWhere.toString();
     }
-    
-    private static void appendCompanyId(StringBuilder sb) {
-        if(filterHandler.companyId != null) {
-            sb.append("cd.empresa_id = ").append("'"+filterHandler.companyId+"'").append(AND);
+
+    private static StringBuilder appendProductionOrderIds(List<Long> productionOrderIds) {
+        var sb = new StringBuilder();
+        if (productionOrderIds != null && !productionOrderIds.isEmpty()) {
+            var productionOrderIdsString = "'" + String.join("', '", productionOrderIds.toString()) + "'";
+            sb.append("consolidacao_demanda.id_externo_documento IN(SELECT codigo_documento FROM mpcp_op_origem WHERE op_id IN (").append(productionOrderIdsString).append(")").append(AND);
         }
+        return sb;
     }
-    private static void appendBranchId(StringBuilder sb) {
-        if(filterHandler.branchId != null) {
-            sb.append("cd.filial_id = ").append("'"+filterHandler.branchId+"'").append(AND);
+
+    private static StringBuilder appendCompanycompanyCode(Long companyCode) {
+        var sb = new StringBuilder();
+        if (companyCode != null) {
+            sb.append("consolidacao_demanda.empresa_id = ").append("'" + companyCode + "'").append(AND);
         }
+        return sb;
     }
-    private static void appendFamilyId(StringBuilder sb) {
-        if(filterHandler.familyId != null) {
-            sb.append("ed.e012fam_id = ").append("'"+filterHandler.familyId+"'").append(AND);
+
+    private static StringBuilder appendBranchCode(Long branchCode) {
+        var sb = new StringBuilder();
+        if (branchCode != null) {
+            sb.append("consolidacao_demanda.filial_id = ").append("'" + branchCode + "'").append(AND);
         }
+        return sb;
     }
-    private static void appendSkuIds(StringBuilder sb) {
-        if(filterHandler.skuIds != null && !filterHandler.skuIds.isEmpty()) {
-            String skuIds = "'" + String.join("', '", filterHandler.skuIds)+ "'";
-            sb.append("ei.e075der_id IN (").append(skuIds).append(")").append(AND);
+
+    private static StringBuilder appendFamilyCode(String familyCode) {
+        var sb = new StringBuilder();
+        if (familyCode != null) {
+            sb.append("e075der.e012fam_id = ").append("'" + familyCode + "'").append(AND);
         }
+        return sb;
     }
-    private static void appendDocuments(StringBuilder sb) { //RAFAEL AJUSTAR PARA A CONCATENAÇÃO
-        if(filterHandler.documents != null && !filterHandler.documentos.isEmpty()) {
-            String documents = "'" +- String.join("', '", filterHandler.documents) + "'";
-            sb.append("moo.codigo_documento LIKE 'PED-% IN (").append(documents).append(")").append(AND);
+
+    private static StringBuilder appendSkuIds(List<String> skuIds) {
+        var sb = new StringBuilder();
+        if (skuIds != null && !skuIds.isEmpty()) {
+            var skuIdsConcat = "'" + String.join("', '", skuIds) + "'";
+            sb.append("e120ipd.e075der_id IN (").append(skuIdsConcat).append(")").append(AND);
         }
+        return sb;
     }
-    private static void appendStartDate(StringBuilder sb) {
-        if(filterHandler.startDate != null) {
-            sb.append("cd.data_geracao >= ").append("'"+filter.startDate+"'").append(AND);
+
+    private static StringBuilder appendDocuments(List<Long> documents) {
+        var sb = new StringBuilder();
+        if (documents != null && !documents.isEmpty()) {
+            var documentsConcat = "'" + String.join("', '", documents.toString()) + "'";
+            sb.append("mpcp_op_origem.codigo_documento IN (").append(documentsConcat).append(")").append(AND);
         }
+        return sb;
     }
-    private static void appendEndDate(StringBuilder sb) {
-        if(filterHandler.endDate != null) {
-            sb.append("cd.data_geracao <= ").append("'".filter.endDate+"'").append(AND);
+
+    private static StringBuilder appendStartDate(LocalDate startDate) {
+        var sb = new StringBuilder();
+        if (startDate != null) {
+            sb.append("consolidacao_demanda.data_geracao >= ").append("'" + startDate + "'").append(AND);
         }
+        return sb;
     }
-    private static void appendClient(StringBuilder sb) {
-        if(filterHandler.client != null && !filterHandler.client.isEmpty()) {
-            String clients = "'" + String.join("', '", filterHandler.client) + "'";
-            sb.append("ep.e001pescli_id IN (").append(clients).append(")").append(AND);
+
+    private static StringBuilder appendEndDate(LocalDate endDate) {
+        var sb = new StringBuilder();
+        if (endDate != null) {
+            sb.append("consolidacao_demanda.data_geracao <= ").append("'" + endDate + "'").append(AND);
         }
-        
+        return sb;
     }
-    private static void appendDemands(StringBuilder sb) {
-        if(filterHandler.demands != null && !filterHandler.demands.isEmpty()) {
-            String demands = "'" + String.join("', '", filterHandler.demands) + "'";
-            sb.append("cd.codigo_documento IN ( ").append(demands).append(")").append(AND);
+
+    private static StringBuilder appendClient(List<Long> client) {
+        var sb = new StringBuilder();
+        if (client != null && !client.isEmpty()) {
+            var clientsConcat = "'" + String.join("', '", client.toString()) + "'";
+            sb.append("e120ped.e001pescli_id IN (").append(clientsConcat).append(")").append(AND);
         }
+        return sb;
     }
-    private static void appendSituationDemand(StringBuilder sb) {
-        if(filterHandler.situationDemand != null) {
-            sb.append("cd.situacao = ").append("'"+filterHandler.situationDemand+"'").append(AND);
+
+    private static StringBuilder appendDemands(List<Long> demands) {
+        var sb = new StringBuilder();
+        if (demands != null && !demands.isEmpty()) {
+            var demandsConcat = "'" + String.join("', '", demands.toString()) + "'";
+            sb.append("consolidacao_demanda.demanda_codigo IN ( ").append(demandsConcat).append(")").append(AND);
         }
+        return sb;
     }
-    private static void appendDeliveryStartDate(StringBuilder sb) {
-        if(filterHandler.deliveryStartDate !=null) {
-            sb.append("cd.data_entrega >= ").append("'"+filterHandler.deliveryStartDate+"'").append(AND);
+
+    private static StringBuilder appendSituationDemand(EnumSituacaoDemanda situationDemand) {
+        var sb = new StringBuilder();
+        if (situationDemand != null) {
+            sb.append("consolidacao_demanda.situacao = ").append("'" + situationDemand + "'").append(AND);
         }
+        return sb;
     }
-    private static void appendDeliveryEndDate(StringBuilder sb) {
-        if(filterHandler.deliveryStartDate !=null) {
-            sb.append("cd.data_entrega <= ").append("'"+filterHandler.deliveryStartDate+"'").append(AND);
+
+    private static StringBuilder appendDeliveryStartDate(LocalDate deliveryStartDate) {
+        var sb = new StringBuilder();
+        if (deliveryStartDate != null) {
+            sb.append("consolidacao_demanda.data_entrega >= ").append("'" + deliveryStartDate + "'").append(AND);
         }
+        return sb;
+    }
+
+    private static StringBuilder appendDeliveryEndDate(LocalDate deliveryEndDate) {
+        var sb = new StringBuilder();
+        if (deliveryEndDate != null) {
+            sb.append("consolidacao_demanda.data_entrega <= ").append("'" + deliveryEndDate + "'").append(AND);
+        }
+        return sb;
     }
 
 }
