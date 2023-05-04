@@ -1,14 +1,22 @@
+package br.com.senior.erp.man.pcp.programacaocontrole.domain.otif;
+
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
 import org.springframework.stereotype.Component;
 
+import br.com.senior.erp.man.pcp.programacaocontrole.domain.familia.FamiliaRepository;
+import br.com.senior.erp.man.pcp.programacaocontrole.domain.op.origem.OrdemProducaoOrigem;
+import br.com.senior.erp.man.pcp.programacaocontrole.domain.op.origem.OrdemProducaoOrigemRepository;
+import br.com.senior.erp.man.pcp.programacaocontrole.domain.pessoa.PessoaRepository;
+import br.com.senior.erp.man.pcp.programacaocontrole.domain.sku.SKURepository;
+import br.com.senior.erpman.pcpprogramacaocontrole.EnumSituacaoDemanda;
+import br.com.senior.erpman.pcpprogramacaocontrole.RecFilterNeedsOTIF;
+
 @Component
-public class SqlBuilderWhere {
+public final class SqlBuilderWhere {
 
     private static final String AND = " AND ";
 
@@ -22,13 +30,18 @@ public class SqlBuilderWhere {
 
     @Inject
     private SKURepository skuRepository;
-    
-    @Inject OrdemProducaoOrigemRepository opOrigemRepository;
+
+    @Inject
+    private OrdemProducaoOrigemRepository opOrigemRepository;
+
+    private SqlBuilderWhere() {
+    }
 
     public String sqlWhereBuilder(RecFilterNeedsOTIF request) {
 
         var mountSqlWhere = new StringBuilder(" WHERE ");
 
+        mountSqlWhere.append(appendProductionOrderIds(request.productionOrderIds));
         mountSqlWhere.append(appendCompanyCode(request.companyCode));
         mountSqlWhere.append(appendBranchCode(request.branchCode, request.companyCode));
         mountSqlWhere.append(appendFamilyCode(request.familyCode));
@@ -41,8 +54,6 @@ public class SqlBuilderWhere {
         mountSqlWhere.append(appendSituationDemand(request.situationDemand));
         mountSqlWhere.append(appendDeliveryStartDate(request.deliveryStartDate));
         mountSqlWhere.append(appendDeliveryEndDate(request.deliveryEndDate));
-        mountSqlWhere.append(appendProductionOrderIds(request.productionOrderIds));
-
 
         if (mountSqlWhere.toString().endsWith(AND)) {
             mountSqlWhere.setLength(mountSqlWhere.length() - ANDSIZE);
@@ -51,10 +62,37 @@ public class SqlBuilderWhere {
         return mountSqlWhere.toString();
     }
 
+    private StringBuilder appendProductionOrderIds(List<Long> productionOrderIds) {
+        var sb = new StringBuilder();
+        if (productionOrderIds != null && !productionOrderIds.isEmpty()) {
+            var productionOrderIdsString = "";
+            productionOrderIdsString = forProductionOrderIdsValidation(productionOrderIds, productionOrderIdsString);
+            productionOrderIdsString = productionOrderIdsString.replaceAll("[\\[\\]]", "");
+            sb.append("consolidacao_demanda_remote.id_externo_documento IN(").append(productionOrderIdsString).append(")").append(AND);
+        }
+        return sb;
+    }
+
+    private String forProductionOrderIdsValidation(List<Long> productionOrderIds, String productionOrderIdsString) {
+        for (Long opId : productionOrderIds) {
+            var opData = opOrigemRepository.findByOrdemProducaoId(opId);
+            if ("".equals(productionOrderIdsString)) {
+                for (OrdemProducaoOrigem op : opData) {
+                    productionOrderIdsString = productionOrderIdsString.concat("'" + op.getCodigoDocumento() + "'");
+                }
+            } else {
+                for (OrdemProducaoOrigem op : opData) {
+                    productionOrderIdsString = productionOrderIdsString.concat(", '" + op.getCodigoDocumento() + "'");
+                }
+            }
+        }
+        return productionOrderIdsString;
+    }
+
     private StringBuilder appendCompanyCode(Long companyCode) {
         var sb = new StringBuilder();
         if (companyCode != null) {
-            var companyUuid = pessoaRepository.findById(companyCode);
+            var companyUuid = pessoaRepository.findEmpresaByCodigoThrowsException(companyCode);
             sb.append("consolidacao_demanda_remote.empresa_id = '").append(companyUuid.getErpxId()).append("'").append(AND);
         }
         return sb;
@@ -62,9 +100,8 @@ public class SqlBuilderWhere {
 
     private StringBuilder appendBranchCode(Long branchCode, Long companyCode) {
         var sb = new StringBuilder();
-        //testar pesquisa
         if (branchCode != null) {
-            var filialUuid = pessoaRepository.findFilialById(companyCode, branchCode);
+            var filialUuid = pessoaRepository.findFilialByCodigoThrowsException(branchCode, companyCode);
             sb.append("consolidacao_demanda_remote.filial_id = '").append(filialUuid.getErpxId()).append("'").append(AND);
         }
         return sb;
@@ -74,7 +111,7 @@ public class SqlBuilderWhere {
         var sb = new StringBuilder();
         if (familyCode != null) {
             var familyUuid = familiaRepository.findFamiliaByCodigoThrowsException(familyCode);
-            sb.append("e075der.e012fam_id = ").append(familyUuid.getErpxId()).append(AND);
+            sb.append("e075der_remote.e012fam_id = '").append(familyUuid.getErpxId()).append("'").append(AND);
         }
         return sb;
     }
@@ -82,27 +119,32 @@ public class SqlBuilderWhere {
     private StringBuilder appendSkuIds(List<String> skuIds) {
         var sb = new StringBuilder();
         if (skuIds != null && !skuIds.isEmpty()) {
-            var skuUuid = new ArrayList<>();
-            skuUuid.addAll(skuIds.stream().map(sku ->{  
-            return skuRepository.findByCodigoThrowsException(sku);
-            }).collect(Collectors.toList()));
-            var skuIdsConcat = "'" + String.join("', '", skuIds) + "'";
-            sb.append("e120ipd.e075der_id IN (").append(skuIdsConcat).append(")").append(AND);
+            var skuIdsConcat = "";
+            for (String sku : skuIds) {
+                var skuData = skuRepository.findByCodigoThrowsException(sku);
+                if ("".equals(skuIdsConcat)) {
+                    skuIdsConcat = skuIdsConcat.concat("'" + skuData.getErpxId() + "'");
+                } else {
+                    skuIdsConcat = skuIdsConcat.concat(", '" + skuData.getErpxId() + "'");
+                }
+            }
+            sb.append("e120ipd_remote.e075der_id IN (").append(skuIdsConcat).append(")").append(AND);
         }
         return sb;
     }
 
-    private static StringBuilder appendDocuments(List<Long> documents) {
+    private StringBuilder appendDocuments(List<Long> documents) {
         var sb = new StringBuilder();
         if (documents != null && !documents.isEmpty()) {
-            var filteredDocuments = documents.stream()
-                    .filter(document -> document.toString().startsWith("PED-"))
-                    .collect(Collectors.toList());
-            if (!filteredDocuments.isEmpty()) {
-                var documentsConcat =String.join("', '", filteredDocuments.toString());
-                documentsConcat = documentsConcat.replaceAll("[\\[\\]]", "");
-                sb.append("consolidacao_demanda.numero_documento IN (").append(documentsConcat).append(")").append(AND);
+            var documentsConcat = "";
+            for (Long d : documents) {
+                if ("".equals(documentsConcat)) {
+                    documentsConcat = documentsConcat.concat("'%PED-" + d + "%'");
+                } else {
+                    documentsConcat = documentsConcat.concat(", '%PED-" + d + "%'");
+                }
             }
+            sb.append("consolidacao_demanda_remote.numero_documento LIKE any(array[").append(documentsConcat).append("])").append(AND);
         }
         return sb;
     }
@@ -126,9 +168,16 @@ public class SqlBuilderWhere {
     private StringBuilder appendClient(List<Long> client) {
         var sb = new StringBuilder();
         if (client != null && !client.isEmpty()) {
-            var clientsConcat = String.join("', '", client.toString());
-            clientsConcat = clientsConcat.replaceAll("[\\[\\]]", "");
-            sb.append("e120ped.e001pescli_id IN (").append(clientsConcat).append(")").append(AND);
+            var clientsConcat = "";
+            for (Long c : client) {
+                var dataClient = pessoaRepository.findClienteByCodigoThrowsException(c);
+                if ("".equals(clientsConcat)) {
+                    clientsConcat = clientsConcat.concat("'" + dataClient.getErpxId() + "'");
+                } else {
+                    clientsConcat = clientsConcat.concat(", '" + dataClient.getErpxId() + "'");
+                }
+            }
+            sb.append("e120ped_remote.e001pescli_id IN (").append(clientsConcat).append(")").append(AND);
         }
         return sb;
     }
@@ -136,9 +185,15 @@ public class SqlBuilderWhere {
     private StringBuilder appendDemands(List<Long> demands) {
         var sb = new StringBuilder();
         if (demands != null && !demands.isEmpty()) {
-            var demandsConcat = String.join("', '", demands.toString());
-            demandsConcat = demandsConcat.replaceAll("[\\[\\]]", "");
-            sb.append("consolidacao_demanda_remote.demanda_codigo IN ( ").append(demandsConcat).append(")").append(AND);
+            var demandsConcat = "";
+            for (Long d : demands) {
+                if ("".equals(demandsConcat)) {
+                    demandsConcat = demandsConcat.concat("'" + d + "'");
+                } else {
+                    demandsConcat = demandsConcat.concat(", '" + d + "'");
+                }
+            }
+            sb.append("consolidacao_demanda_remote.demanda_codigo IN (").append(demandsConcat).append(")").append(AND);
         }
         return sb;
     }
@@ -163,20 +218,6 @@ public class SqlBuilderWhere {
         var sb = new StringBuilder();
         if (deliveryEndDate != null) {
             sb.append("consolidacao_demanda_remote.data_entrega <= ").append("'" + deliveryEndDate + "'").append(AND);
-        }
-        return sb;
-    }
-    
-    private StringBuilder appendProductionOrderIds(List<Long> productionOrderIds) {
-        var sb = new StringBuilder();
-        if (productionOrderIds != null && !productionOrderIds.isEmpty()) {
-            var opUUID = new ArrayList<>();
-            opUUID.addAll(productionOrderIds.stream().map(op ->{  
-            return opOrigemRepository.findByOrdemProducaoId(op);
-            }).collect(Collectors.toList()));
-            var productionOrderIdsString = String.join("', '", productionOrderIds.toString());
-            productionOrderIdsString = productionOrderIdsString.replaceAll("[\\[\\]]", "");
-            sb.append("consolidacao_demanda_remote.id_externo_documento IN(").append(productionOrderIdsString).append(")").append(AND);
         }
         return sb;
     }
