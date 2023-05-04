@@ -1,20 +1,3 @@
-package br.com.senior.erp.man.pcp.programacaocontrole.domain.otif;
-
-import java.time.LocalDate;
-import java.util.List;
-
-import javax.inject.Inject;
-
-import org.springframework.stereotype.Component;
-
-import br.com.senior.erp.man.pcp.programacaocontrole.domain.familia.FamiliaRepository;
-import br.com.senior.erp.man.pcp.programacaocontrole.domain.op.origem.OrdemProducaoOrigem;
-import br.com.senior.erp.man.pcp.programacaocontrole.domain.op.origem.OrdemProducaoOrigemRepository;
-import br.com.senior.erp.man.pcp.programacaocontrole.domain.pessoa.PessoaRepository;
-import br.com.senior.erp.man.pcp.programacaocontrole.domain.sku.SKURepository;
-import br.com.senior.erpman.pcpprogramacaocontrole.EnumSituacaoDemanda;
-import br.com.senior.erpman.pcpprogramacaocontrole.RecFilterNeedsOTIF;
-
 @Component
 public final class SqlBuilderWhere {
 
