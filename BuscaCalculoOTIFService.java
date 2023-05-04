@@ -1,20 +1,3 @@
-package br.com.senior.erp.man.pcp.programacaocontrole.domain.otif;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
-import javax.inject.Inject;
-
-import org.springframework.stereotype.Service;
-
-import br.com.senior.erp.man.pcp.database.fdw.DatacenterFilter;
-import br.com.senior.erp.man.pcp.database.fdw.FdwExecutor;
-import br.com.senior.erpman.pcpprogramacaocontrole.RecFilterNeedsOTIF;
-import br.com.senior.erpman.pcpprogramacaocontrole.SearchCalculationOTIFOutput;
-import br.com.senior.erpx.dataproxy.model.MetaDataConfig;
-
 @Service
 public class BuscaCalculoOTIFService implements FdwExecutor {
 
