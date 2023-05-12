@@ -39,19 +39,41 @@ public class RecursoRepository extends AbstractRepository<Recurso, QRecurso> {
 
         return findOne(predicate);
     }
-
+/**
+ * Query getPredicatePesquisa. O retorno da pesquisa será uma lista de recursos de acordo com o filtro passado pelo usuário no parametro request
+ * 
+ * @param request
+ * @author: rmcedo
+ */
     public Predicate getPredicatePesquisa(final PesquisarRecursoInput request) {
         final BooleanBuilder predicate = new BooleanBuilder();
 
+        /**
+         * request.empresaCodigo. Realiza a verificação se o código passado no parametro se encontra no DB e se o tipo que consta é do TipoPessoa.EMPRESA
+         * 
+         * request.empresaCodigo é o único campo não opcional da request
+         * 
+         * Necessário essa verificação pois na tabela Pessoa, são cadastrados todos os tipos, como EMPRESA, FILIAL, CLIENTE OU FORNECEDOR
+         */
         predicate //
                 .and(getEntityPath().pessoa.codigo.eq(request.empresaCodigo) //
                         .and(getEntityPath().pessoa.tipo.eq(TipoPessoa.EMPRESA)));
 
+
+        /**
+         * request.filiarCodigo. Como é um campo opcional, primeiro é verificado se o usuário passou o valor para filialCodigo
+         * Em seguida é realizada a mesma verificação de empresaCodigo, para verificar se o parametro passado é do TipoPessoa.FILIAL
+         */
         if (request.filialCodigo != null) {
             predicate//
                     .and(getEntityPath().filial.codigo.eq(request.filialCodigo)//
                             .and(getEntityPath().filial.tipo.eq(TipoPessoa.FILIAL)));
         }
+        /**
+         * request.filtro. Como é um campo opcional, primeiramente verificamos se o valor é passado. 
+         * Caso seja passado, realizamos a verificação se o parametro passado é do tipo codigo, se sim é realizado um Like na query para verificar a similaridade
+         * ou então é verificado se o parametro passado é do tipo descricao, se sim, também é realizado um Like na query para verificar a similaridade
+         */
         if (request.filtro != null) {
             predicate.and(getEntityPath().codigo.likeIgnoreCase("%" + request.filtro + "%")//
                     .or(getEntityPath().descricao.likeIgnoreCase("%" + request.filtro + "%")));
@@ -64,6 +86,13 @@ public class RecursoRepository extends AbstractRepository<Recurso, QRecurso> {
     }
 
 
+    /**
+     * Nesse método privado, chamado acima, realizamos uma subQuery em outra tabela para buscar o codigo do Recurso de Processos Industriais.
+     * Realizamos o select e reutilizamos a saída da query como filtro no parametro request.processoIndustrialCodigo
+     * 
+     * @param request
+     * @param predicate
+     */
     private void processoIndustrialRecursoSubQuery(final PesquisarRecursoInput request, final BooleanBuilder predicate) {
         if (request.processoIndustrialCodigo != null) {
 
@@ -78,6 +107,17 @@ public class RecursoRepository extends AbstractRepository<Recurso, QRecurso> {
 
         }
     }
+    /**
+     * Nesse método privado, chamado acima, realizamos as verificação nos parametros relacionados ao Centro de Recurso.
+     * 
+     * Realizamos a verificação se o parametro centroRecursoId é passado, se sim, adicionamos o campo dentro do filtro na query
+     * 
+     * Também é realizado a verificação do request.tipoRecurso. Verificamos se é nulo ou vazio, pois é um campo do tipo Lista.
+     * Se sim, adicionamos cada campo, através de um stream().map(), cada campo do filtro na query
+     * 
+     * @param request
+     * @param predicate
+     */
     private void centroRecursoValidationsAndQueries(final PesquisarRecursoInput request, final BooleanBuilder predicate) {
         if (request.centroRecursoId != null) {
             predicate.and(getEntityPath().centroRecurso.id.eq(request.centroRecursoId));
@@ -92,6 +132,11 @@ public class RecursoRepository extends AbstractRepository<Recurso, QRecurso> {
         }
     }
 
+    /**
+     * Nesse método privado, chamado no método privado acima, realizamos o switch dos itens que poderiam ser passados na lista
+     * Realizamos uma espécie de conversão do campo. Caso seja do tipo correto, é realizado a "conversão".
+     * Caso não seja do tipo desejado, jogamos uma exceção informando que o tipo de recurso é inválido
+     */
     private TipoRecurso mapToTipoRecurso(EnumTipoRecurso enumTipoRecurso) {
         switch (enumTipoRecurso) {
             case Celula:
